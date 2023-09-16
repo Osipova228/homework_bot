@@ -2,16 +2,20 @@ import logging
 import os
 import time
 import requests
+
 import telegram
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+if __name__ == '__main__':
+    logger = logging.getLogger(__name__)
+
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -28,24 +32,23 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-LST_NOT_NULL = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
-
 
 def check_tokens():
     """Проверяет доступность переменных окружения.
     Если отсутствует хотя бы одна переменная окружения —
     продолжать работу бота нет смысла.
     """
-    if not PRACTICUM_TOKEN:
-        logging.critical('Отсутствует обязательная переменная PRACTICUM_TOKEN')
-        exit()
-    elif not TELEGRAM_CHAT_ID:
-        logging.critical(
-            'Отсутствует обязательная переменная TELEGRAM_CHAT_ID'
-        )
-        exit()
-    elif not TELEGRAM_TOKEN:
-        logging.critical('Отсутствует обязательная переменная TELEGRAM_TOKEN')
+    LST_NOT_NULL = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
+    LST_NOT_NULL_STRING = [
+        'PRACTICUM_TOKEN', 'TELEGRAM_TOKEN', 'TELEGRAM_CHAT_ID'
+    ]
+    if not all(LST_NOT_NULL):
+        for i in range(len(LST_NOT_NULL)):
+            if not LST_NOT_NULL[i]:
+                logging.critical(
+                    'Отсутствует обязательная переменная '
+                    f'{LST_NOT_NULL_STRING[i]}'
+                )
         exit()
     logging.debug('Проверка ключей закончилась успешно')
 
@@ -94,9 +97,7 @@ def check_response(response):
     В качестве параметра функция получает ответ API,
     приведенный к типам данных Python.
     """
-    if isinstance(response, dict):
-        logging.debug('Проверка типа данных ответа сервера прошла успешно')
-    else:
+    if not isinstance(response, dict):
         raise TypeError(
             f'Неправильный тип данных ответа сервера: {type(response)}'
         )
@@ -106,9 +107,7 @@ def check_response(response):
             f'Ответ сервера не содержит ключ "homeworks": {response}'
         )
 
-    if isinstance(response['homeworks'], list):
-        logging.debug('Проверка типа ключа homeworks прошла успешно')
-    else:
+    if not isinstance(response['homeworks'], list):
         raise TypeError(
             'В ответе API домашки под ключом `homeworks`'
             ' данные приходят не в виде списка.'
@@ -161,7 +160,7 @@ def main():
                 send_message(bot, homework_status)
             else:
                 homework_status = parse_status(homework)
-
+            timestamp = response['form_date']
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if last_send['error'] != message:
