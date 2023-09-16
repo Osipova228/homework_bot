@@ -9,14 +9,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-if __name__ == '__main__':
-    logger = logging.getLogger(__name__)
-
-    logging.basicConfig(
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        level=logging.INFO
-    )
-
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
@@ -51,6 +43,7 @@ def check_tokens():
                 )
         exit()
     logging.debug('Проверка ключей закончилась успешно')
+    return(True)
 
 
 def send_message(bot, message):
@@ -73,8 +66,14 @@ def get_api_answer(timestamp):
     В случае успешного запроса должна вернуть ответ API,
     приведя его из формата JSON к типам данных Python.
     """
+    current_time = timestamp or int(time.time())
+    params_request = {
+        'url': ENDPOINT,
+        'headers': HEADERS,
+        'params': {'from_date': current_time},
+    }
     try:
-        response = requests.get(ENDPOINT, headers=HEADERS, params=timestamp)
+        response = requests.get(**params_request)
 
         if response.status_code != 200:
             raise Exception(f'Сбой при обращении к URL {response.request.url}')
@@ -82,8 +81,8 @@ def get_api_answer(timestamp):
         logging.debug('Ответ от сервера получен')
         response_data = response.json()
 
-        if 'form_date' not in response_data:
-            raise Exception('Отсутствует параметр `form_date`')
+        if 'current_date' not in response_data:
+            raise Exception('Отсутствует параметр `current_date`')
 
     except requests.RequestException as e:
         logging.error(f'Ошибка отправки запроса. {e}')
@@ -122,8 +121,13 @@ def parse_status(homework):
     В случае успеха, функция возвращает подготовленную для отправки строку,
     содержащую один из вердиктов словаря HOMEWORK_VERDICTS.
     """
+    if not homework:
+        return 'Отсутствуют домашние работы'
+
     if 'homework_name' not in homework:
-        raise KeyError('В ответе API домашки нет ключа `homework_name`.')
+        raise KeyError('В ответе отсутствует ключ homework_name')
+
+    homework_name = homework.get('homework_name')
 
     if 'status' not in homework:
         raise KeyError('В ответе API домашки нет ключа `status`.')
@@ -136,7 +140,6 @@ def parse_status(homework):
             ' домашней работы.'
         )
 
-    homework_name = homework['homework_name']
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
@@ -160,7 +163,7 @@ def main():
                 send_message(bot, homework_status)
             else:
                 homework_status = parse_status(homework)
-            timestamp = response['form_date']
+            timestamp = response['current_date']
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if last_send['error'] != message:
@@ -171,4 +174,10 @@ def main():
 
 
 if __name__ == '__main__':
+    logger = logging.getLogger(__name__)
+
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        level=logging.INFO
+    )
     main()
